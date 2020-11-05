@@ -1,0 +1,296 @@
+---
+title: "Homework 8"
+subtitle: <center> <h1>Logistic Regression</h1> </center>
+author: <center> < Daniel Brewer > <center>
+output: html_document
+---
+
+<style type="text/css">
+h1.title {
+font-size: 40px;
+text-align: center;
+}
+</style>
+
+```{r setup, include=FALSE}
+# load packages here
+library(tidyverse)
+library(corrplot)  # for the correlation matrix
+library(bestglm)  # for variable selection
+library(car)  # for VIFs
+sz <- 22
+```
+
+## Data and Description
+
+**NOTE: For this assignment, you do not need to make your graphs/plots look "pretty", meaning you do not need to worry about changing the axis limits, relabeling axes, etc.**
+
+Bike sharing systems are the new generation of traditional bike rentals where the process from membership, rental and return back has become automatic. Through these systems, users are able to easily rent a bike from a particular position and return back at another position. Currently, there are about over 500 bike sharing programs around the world which is composed of over 500,000 bicycles. Today, there exists great interest in these systems due to their important role in traffic, environmental and health issues.
+
+The bike-sharing rental process is highly correlated with environmental and seasonal settings. For instance, weather conditions, precipitation, day of week, season, hour of the day, etc. can affect the volume of rentals. This data set is composed from the two-year historical data corresponding to years 2011 and 2012 from the Capital Bike share system in Washington D.C. The daily counts of the number of bikes used was extracted and then the corresponding weather and seasonal information was added.
+
+The data set has information for 731 days and contains the following variables:
+
+Variable   | Description
+---------- | -------------
+season     | Season (Fall, Spring, Summer, Winter)
+yr         | Year (2011, 2012)
+holiday    | Was the day a holiday (Yes/No)?
+workingday | Was the day a working day (Yes/No)? (Yes if the day is neither a weekend nor a holiday)
+weathersit | Weather (Clear, Light Precip, Misty)
+temp       | Normalized temperature in Celsius
+hum        | Normalized humidity
+windspeed  | Normalized windspeed
+cnt        | Number of bikes rented
+
+The data can be found in the Bikes data set on Canvas. Download Bikes.csv, and put it in the same folder as this R Markdown file.
+
+#### 0. Replace the text "< PUT YOUR NAME HERE >" (above next to "author:") with your full name (in quotation marks).
+
+#### 1. Read in the data set, and call the data frame "bikes".  
+
+```{r}
+bikes <- read.csv( file = "Bikes.csv", header = TRUE)
+```
+
+#### 2. Convert the yr variable to a factor. Hint: use `as.factor` and override the current yr column in the data set.
+
+```{r}
+bikes$yr <- as.factor((bikes$yr))
+```
+
+#### 3. Explore the data: create a histogram for the response. *Briefly describe the shape of the distribution.*
+
+```{r, fig.align='center'}
+# Histogram for Bikes rented
+ggplot(data = bikes, mapping = aes(x = cnt)) + 
+  geom_histogram(mapping = aes(y = ..density..), binwidth = 400) +
+  theme_bw()
+```
+
+< The shape of the distribution at first appears slightly normal, but it levels off, then peak again on both sides, only to tail off again. It has more of an M or W shape. >
+
+#### 4. Briefly explain why traditional multiple linear regression methods are not suitable for this data set (even though linear regression may be an appropriate approximation).
+
+< Traditional multiple linear regression methods are not suitable for this distribution because the residuals are not normally distributed, nor are they homoscedastic. >
+
+#### 5. Use a variable selection procedure to help you decide which, if any, variables to omit from the logistic regression model you will soon fit. You may choose which selection method to use (best subsets, forward, backward, sequential replacement, LASSO, or elastic net) and which metric/criteria to use (AIC, BIC, or CV/PMSE).
+
+```{r, fig.align='center'}
+# Best Subsets
+bikes.best.subsets.bic <- bestglm(bikes,
+                                  IC = "BIC",
+                                  method = "exhaustive",
+                                  TopModels = 5,
+                                  family = poisson)
+summary(bikes.best.subsets.bic$BestModel)
+bikes.best.subsets.bic$BestModels
+
+```
+
+#### 6. Write out the Poisson regression model for this data set using the covariates that you see fit. You should use parameters/Greek letters (NOT the "fitted" model using numbers...since you have not fit a model yet;) ). Be sure to use indicator variables, if necessary.
+
+< $$log(\mu_i) = \beta_0 + \beta_1I(season = "Spring") + \beta_2I(season = "Summer") + \beta_3I(season = "Winter") + \beta_4I( yr = "2012") + \beta_5I(holiday = "Yes") + \beta_6I(weathersit = "Light Precip") + \beta_7I(weathersit = "Misty") + \beta_8temp + \beta_{9}hum + \beta_{10}windspeed $$ >
+
+#### 7. Fit a Poisson regression model using the covariates that you used in the previous question (use the `glm` function - do not just call the result from the variable selection procedure). 
+
+```{r, fig.align='center'}
+bikes.poisson <- glm(cnt ~ season + yr + holiday + workingday + weathersit + temp + hum + windspeed, family = poisson(link = "log"), data = bikes) 
+summary(bikes.poisson)
+```
+
+#### 8. Briefly check the Poisson regression model assumptions, as dictated below. After diagnosing each assumption, briefly explain why you think the assumptions are met or not met. *For assumptions 1 and 6, make sure to use all diagnostics we reviewed in class.*
+
+```{r, fig.align='center'}
+# (1) The x's vs log(y) are linear
+# create a scatterplot of the log of the response against any continuous
+# predictors you included in the model
+scatter.smooth(x = bikes$season, y = bikes$cnt, 
+               pch = 19, xlab = "Season", ylab = "Rentals")
+scatter.smooth(x = bikes$yr, y = bikes$cnt, 
+               pch = 19, xlab = "Year", ylab = "Rentals")
+scatter.smooth(x = bikes$holiday, y = bikes$cnt, 
+               pch = 19, xlab = "Holiday", ylab = "Rentals")
+scatter.smooth(x = bikes$workingday, y = as.numeric(bikes$cnt), 
+               pch = 19, xlab = "WorkingDay", ylab = "Rentals")
+scatter.smooth(x = bikes$weathersit, y = as.numeric(bikes$cnt), 
+               pch = 19, xlab = "Weather", ylab = "Rentals")
+
+# use added variable plots for any continuous predictors you included in the
+# model
+
+avPlots(bikes.poisson, terms = ~ temp + hum + windspeed)
+# (2) The residuals are independent (hint: was the sample random?)
+dia <- bikes
+dia$residuals <- bikes.poisson$residuals
+dia$fitted.values <- bikes.poisson$fitted.values
+ggplot(data = dia, mapping = aes(x = fitted.values, y = residuals)) +
+  geom_smooth() +
+  geom_point() +
+  theme_bw() +
+  theme(aspect.ratio = 1)
+# (3) The model describes all observations (no influential points)
+# you can use several of the metrics we used before like DFBETAS/DFFITS
+# (they are calculated differently, but the same principle holds)
+bodyfat.dffits <- data.frame("dffits" = dffits(bikes.poisson))
+bodyfat.dffits$obs <- 1:length(bikes$cnt)
+
+ggplot(data = bodyfat.dffits) + 
+   geom_point(mapping = aes(x = obs, y = abs(dffits))) +
+   geom_hline(mapping = aes(yintercept = 1), 
+              color = "red", linetype = "dashed") +  # for n <= 30
+#   geom_hline(mapping = aes(yintercept = 2 * sqrt(4 / length(obs))), 
+#              color = "red", linetype = "dashed") +  # for n > 30
+   theme_bw() +
+   theme(aspect.ratio = 1)
+
+ bodyfat.dffits[abs(bodyfat.dffits$dffits) > 1, ]
+# (4) Addtional predictors are unnecessary and (5) no multicollinearity
+# check the Variance Inflation Factors (VIF)
+# this code uses the pseudo R-Squared
+bikes.vifs <- vif(bikes.poisson)
+bikes.vifs
+mean(bikes.vifs)
+
+# (6) Mean = Variance (No overdispersion/underdispersion)
+# Compare the mean and variance of cnt
+var(bikes$cnt)/
+mean(bikes$cnt)
+
+# Fit a Quasi-Poisson model and look at the dispersion parameter estimate 
+# (hint: use the glm function with family = quasipoisson(link = "log"))
+bikes.poisson <- glm(cnt ~ season + yr + holiday + workingday + weathersit + temp + hum + windspeed, family = quasipoisson(link = "log"), data = bikes) 
+summary(bikes.poisson)
+
+
+
+```
+*(1) The x's vs log(y) are linear*
+
+< Most of the scatterplots appear fairly linear and there are no major "bumps" in the variable vs log(response) trends; however, Holiday does have a large curve in the fit. This suggest that there may be a non linear correlation between holiday and cnt. The added variable plots show that all the variables vs the log(response) seem to be linear. I feel that it is safe to assume that the x's vs log(y) are linear, for the most part. >
+
+*(2) The residuals are independent*
+
+< the scatterplot of the residuals vs the fitted values shows that the residuals, although not terrible, are not independent. There is a downward curve that this clearly visible in the residuals.  >
+
+*(3) The model describes all observations (no influential points)*
+
+< The diffits shows that the model describes nearly all of the observations. There is one observation (obs # 668), however, that may be an influential point. We can't be entirely sure without more extensive testing. All the other 730 observations are describes by the model. >
+
+*(4) Additional predictors are unnecessary and (5) no multicollinearity*
+
+< The average VIF for the predictors is 1.456, which is not significantly more than 1. Therefore, we can assume that the multicollinearity assumption is met. There is no multicollinearity. >
+
+*(6) Mean = Variance (no overdispersion/underdispersion)*
+
+< The Dispersion parameter for the quasipoisson model is 171.9393, which is much higher than 1; therefore, we do have an overdispersion problem, and the mean does not equal the variance. >
+
+### Regardless of your assessment of the assumptions, proceed as if all assumptions were met.
+
+#### 9. For the coefficient for temp, compute (and output) $\beta_{temp}$ (pull this value from the model output), $\exp\{\beta_{temp}\}$, and $100 \times (\exp\{\beta_{temp}\} - 1)%$.
+
+```{r, fig.align='center'}
+bikes.poisson$coefficients[10]
+
+exp(bikes.poisson$coefficients[10])
+
+100*exp(bikes.poisson$coefficients[10]-1)
+```
+
+#### 10. Interpret the coefficient for temp based on the FOUR different ways we discussed in class.
+
+*Interpretation 1:* < Holding all else constant, for every one unit increase in temperature, the log of the mean cnt increases by 1.221 >
+
+*Interpretation 2:* < Since the coefficient of temp is > 0, then the cnt increases as the temp increases, while holding all else constant, on average. >
+
+
+*Interpretation 3:* < Holding all else constant, as temp increases by one, the average number of bike rentals is 3.392 times larger, on average. >
+
+*Interpretation 4:* < Holding all else constant, as temp increases by one, the average number of rentals increases by 124.78% on average. >
+
+#### 11. For the coefficient for holiday, compute (and output) $\beta_{holiday}$ (pull this value from the model output), $\exp\{\beta_{holiday}\}$, and $100 \times (\exp\{\beta_{holiday}\} - 1)%$.
+
+```{r, fig.align='center'}
+bikes.poisson$coefficients[6]
+
+exp(bikes.poisson$coefficients[6])
+
+100*exp(bikes.poisson$coefficients[6]-1)
+```
+
+#### 12. Interpret the coefficient for holiday based on the FOUR different ways we discussed in class.
+
+*Interpretation 1:* < Holding all else constant, as holiday goes from no to yes, the log of the mean cnt decreases by 1.221 >
+
+*Interpretation 2:* < Since the coefficient of temp is < 0, then the cnt decreases as the holiday becomes true, while holding all else constant, on average. >
+
+
+*Interpretation 3:* < Holding all else constant, as holiday goes from no to yes, the average number of bike rentals is 0.8475 times larger, on average. >
+
+*Interpretation 4:* < Holding all else constant, as temp increases by one, the average number of rentals increases by 31.179% on average. >
+
+#### 13. Create 95% confidence intervals for $\beta_k$, $\exp\{\beta_k\}$, and $100 \times (\exp\{\beta_k\} - 1)%$ for all predictors using the `confint` function.
+
+```{r, fig.align='center'}
+confint(bikes.poisson, level = 0.95)
+
+exp(confint(bikes.poisson, level = .95))
+
+100*exp(confint(bikes.poisson, level = .95) - 1)
+```
+
+#### 14. Interpret the 95% confidence intervals for holiday for $\beta_{holiday}$, $\exp\{\beta_{holiday}\}$, and $100 \times (\exp\{\beta_{holiday}\} - 1)%$ (three interpretations total).
+
+*Interpretation using $\beta_{holiday}$:*  < We are 95% confident that the as as holiday goes from no to yes, the logodd of the average count of rentals decreases by between .2625 and .0709, holding else all constant, on average >
+
+*Interpretation using $\exp\{\beta_{holiday}\}$:* < We are 95% confident that as holiday goes from no to yes, the average number of occurrences is between .7691 and .9316 times larger, holding all else constant, on average.>
+
+*Interpretation using $100 \times (\exp\{\beta_{holiday}\} - 1)%$:* < We are 95% confident that as holiday goes from no to yes, the average number of occurrences increases between 28.29% and 34.27%, holding all else constant, on average. >
+
+#### 15. Calculate a 95% confidence interval (and point estimate) for the predicted average number of bike rentals for a day where season = "Spring", yr = "2012", holiday = "No", workingday = "Yes", weathersit = "Misty", temp = 0.34, hum = 0.80, and windspeed = 0.18. Note that you may not need to use all of these values depending on the variables you chose to include in your model. *Interpret the interval.*
+
+```{r, fig.align='center'}
+new.day <- data.frame(season = "Spring", yr = "2012", holiday = "No", workingday = "Yes", weathersit = "Misty", temp = 0.34, hum = 0.80, windspeed = 0.18)
+# get the predicted log of the average number of crashes with the 
+# standard error
+pred.log <- predict(bikes.poisson, newdata = new.day, se.fit = TRUE)
+# compute the margin of error
+me <- qnorm(0.975) * pred.log$se.fit
+# compute the 95% confidence interval (and point estimate) for the log of
+# the average number of crashes
+pred.interval <- pred.log$fit + c(-1, 0, 1) * me
+# compute the 95% confidence interval (and point estimate) for the predicted 
+# average number of total crashes
+round(exp(pred.interval), 2)
+```
+
+< We are 95% confident that for a day where season = "Spring", yr = "2012", holiday = "No", workingday = "Yes", weathersit = "Misty", temp = 0.34, hum = 0.80, and windspeed = 0.18, the count of bike rentals would be expected to lie between 2922 and 3219, on average. >
+
+#### 16. Compute the likelihood ratio test statistic for the model, and compute the associated $p$-value. Based on the results, what do you conclude?
+
+```{r, fig.align='center'}
+# Likelihood ratio test statistic
+# hint: use the deviances reported in the logistic regression model output
+dev_null <- 668801
+res_null <- 132657
+lrt_stat <- -2*log(dev_null) - (-2*log(res_null))
+lrt_stat
+# Likelihood ratio p-value
+# hint: use the pchisq function
+pchisq(lrt_stat, df = 11)
+```
+
+< According to the P-value of 0 and test statistic of -3.24 We can conclude that our model is significantly better than the null hypothesis at predicting the average number of counts for a given day. >
+
+#### 17. Compute the pseudo $R^2$ value for the model.
+
+```{r, fig.align='center'}
+# Pseudo R-Squared
+# hint: use the deviances reported in the logistic regression model output
+psuedoR2 <- 1 - (res_null/dev_null)
+psuedoR2
+```
+
+#### 18. Briefly summarize (1) the purpose of this data set and analysis and (2) what you learned about this data set from your analysis. Write your response as if you were addressing a non-statistician (do not include any numbers or software output).
+
+< (1) The purpose of this data set was to see if we could accurately predict the number of bike rentals on a given day based off of the weather conditions and the day of the week or whether or not it was a holiday. (2) From our analysis we can conclude that we can accurately predict the number of bike rentals on a given day based off of the weather conditions, the day of the week, and whether or not it is a holiday. We found that our predictive model is significantly better at predicting the count of bike rentals then the most basic model.>

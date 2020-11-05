@@ -1,0 +1,256 @@
+---
+title: "Homework 5"
+subtitle: <center> <h1>Multiple Linear Regression Additional Variable Types</h1> </center>
+author: <center> < "Daniel Brewer" > <center>
+output: html_document
+---
+
+<style type="text/css">
+h1.title {
+  font-size: 40px;
+  text-align: center;
+}
+</style>
+
+```{r setup, include=FALSE}
+# load packages here
+library(tidyverse)
+library(ggfortify)  # plot lm objects using ggplot instead of base R
+library(car)  # needed for added-variable plots and dfbetas and dffits
+```
+
+## Data and Description
+
+** Note that for the sake of length for this homework assignment, I am not having you check the model assumptions. You certainly can, if you would like, and in "real life" you would definitely need to do this prior to any statistical inference. **
+
+
+Macroeconomists often speculate that life expectancy is linked with the economic well-being of a country. Macroeconomists also hypothesize that Organisation for Economic Co-operation and Development (OECD) (an international think tank charged with promoting policies that will improve global social and economic well-being) members will have longer life expectancy. To test these hypotheses, the LifeExpectancy.txt data set (found on Canvas) contains the following information:
+
+Variable | Description
+-------- | -------------
+LifeExp  | Average life expectancy in years
+Country  | Country name
+Group    | Is the country a member of OECD, Africa, or other?
+PPGDP    | Per person GDP (on the log scale)
+
+The Group variable indicates if the country is a member of the OECD, a member of the African continent, or belonging to neither group (other). Note that the Country variable is just for your reference - you will not use this variable in your model.
+
+Download LifeExpectancy.txt, and put it in the same folder as this R Markdown file.
+
+#### 0. Replace the text "< PUT YOUR NAME HERE >" (above next to "author:") with your full name (in quotation marks).
+
+#### 1. Read in the data set, and call the data frame "life".  
+
+```{r}
+life <- read.csv("LifeExpectancy.txt", header = TRUE, sep = " ")
+```
+
+#### 2. What is the response variable, and is it continuous or categorical?
+
+< The response Variable is Life Expectancy, It is a continuous variable. > 
+
+#### 3. What are the covariates, and are they continuous or categorical?
+
+< The covariates are Group and PPGDP. Country and Group are categorical while PPGDP is a continuous variable. > 
+
+#### 4. Write out the mathematical model (using Greek letters/parameters) that you are thinking about applying to this data set. Use variable names that are descriptive (not $y$, $x_1$, etc.). Remember, you will need to use dummy variables for Group - *USE "other" AS THE BASELINE CATEGORY*.
+
+< $$ LifeExpectancy = \beta_0(Other) + \beta_1(PPDGP) + \beta_2(Africa) + \beta_3(OECD) $$ > 
+
+#### 5. Create a scatterplot with the response on the $y$-axis and the other continuous variable on the $x$-axis. Does it appear that these two variables are related?
+
+```{r, fig.align='center'}
+life.plot_1 <- ggplot(data = life, mapping = aes(x = PPGDP, y = LifeExp)) +
+                geom_point() +
+                theme_bw() +
+                theme(aspect.ratio = 1)
+life.plot_1              
+```
+
+< It does appear that these two variables have a positive, linear correlation; however, it appears that there is also a possible relationship with a categorical variable as well. > 
+
+#### 6. Create a boxplot with the response on the $y$-axis and the categorical variable on the $x$-axis. Does it appear that these two variables are related?
+
+```{r, fig.align='center'}
+life.boxplot <- ggplot(data = life, mapping = aes(x = Group, y = LifeExp)) +
+                geom_boxplot() +
+                theme_bw() +
+                theme(aspect.ratio = 1)
+life.boxplot 
+```
+
+< Based off of the boxplot, it does appear that the LifeExp and the Group variables may related. > 
+
+#### 7. Create color-coded scatterplot using all of the variables that will be in your model. Hint: plot the response on the $y$-axis, the other continuous variable on the $x$-axis, and color the points by the categorical variable.
+
+```{r, fig.align='center'}
+# your code here
+life.colorplot <- ggplot(data = life, mapping = aes(x = PPGDP, y = LifeExp, color = Group)) +
+                geom_point() +
+                theme_bw() +
+                theme(aspect.ratio = 1)
+life.colorplot
+```
+
+#### 8. Create dummy variables for all levels of Group.
+
+```{r}
+levels(life$Group)
+life$Group <- factor(life$Group, levels = c("other", "africa", "oecd"))
+levels(life$Group)
+
+```
+
+#### 9. Fit a multiple linear regression model to the data (no transformations, interactions, etc.) using SOME of the dummy variables you created. *USE "other" AS THE BASELINE CATEGORY FOR GROUP*. Look at a summary of the results.
+
+```{r}
+life.lm <- lm(LifeExp ~ Group + PPGDP, data = life)
+summary(life.lm)
+```
+
+#### 10. Briefly interpret the intercept.
+
+< The expected life of a person in a country who does not belong to the OECD or Africa group, and has no PPGDP, on average, would be expected to live 50.95789 years. > 
+
+#### 11. Briefly interpret the coefficient for PPGDP (log scale).
+
+< The life expectancy for a person in a country increases, on average, by 2.8769 years for every 1% increase in PPDGP. > 
+
+#### 12. Briefly interpret the coefficient for I(Group=OECD).
+
+< The life Expectancy for a country in the "OECD" group, holding PPGDP constant, is 1.52983 years longer, on average, than of those belonging to the Group "Other". > 
+
+#### 13. Briefly interpret the coefficient for I(Group=Africa).
+
+< The life Expectancy for a country in the "Africa" group, holding PPGDP constant, is 12.29427 years shorter, on average, than of those belonging to the Group "Other".  > 
+
+#### 14. For equal per person GDP (log scale), how does life expectancy change for countries that are members of the OECD compared to countries that are on the African continent? Briefly interpret this number.
+
+< The life Expectancy for a country in the "OECD" group, holding PPGDP constant, is 13.8241 years longer, on average, than of those belonging to the Group "Africa". > 
+
+#### 15. Create 95% confidence intervals for all coefficients.
+
+```{r}
+confint(life.lm)
+```
+
+#### 16. Briefly interpret the 95% confidence interval for I(Group=Africa).
+
+< We are 95% confident that the average life expectancy for people of a country living in the "Africa" group is between 12.801967 and 11.786572 years, on average, less than the life expectancy of countries in the "other" group while holding PPGDP constant.  > 
+
+#### 17. Use the `summary` function to identify the hypothesis test that tests all coefficients simultaneously. What do you conclude from the result of the test?
+
+```{r}
+summary(life.lm)
+
+```
+
+< Based off of the hypothesis F test, the F-statistic is 4080 and p-value of 2.2e-16. From this we can conclude that at least one of the variables in the model is significant for predicting LifeExp.  > 
+
+#### 18. Use the `summary` function to locate the hypothesis tests that test one coefficient at a time. What do you conclude from these tests?
+
+```{r}
+summary(life.lm)
+```
+
+< Based off of the Hypothesis T-Test, we can conclude that all of the covariates and their coefficients are considered significant for predicting LifeExp. > 
+
+#### 19. Use the `anova` function to conduct a hypothesis test that tests some coefficients simultaneously. Specifically, test if Group has a significant effect on LifeExp. What do you conclude from the result of the test? Hint: you will need to create another linear model and compare it with the one you made previously.
+
+```{r}
+life.anova.lm <- lm(LifeExp ~ Group, data = life)
+anova(life.anova.lm)
+anova(life.lm)
+```
+
+< Based off of the two ANOVA tables, we can see that both linear models have group as being significant for predicting LifeExp with p-values of 2.2e-16. The model with both the PPGDP and the Group variables has a much lower MSE to use as an estimate of the variance, therefore, it may be a better, more accurate model. > 
+
+#### 20. Create a 95% confidence interval for the average life expectancy for a country in the OECD with an average per person GDP (log scale) of 9.5. *Briefly interpret this interval.*
+
+```{r}
+new.dat <- data.frame(PPGDP = 9.5, Group = "oecd")
+predict(life.lm, newdata = new.dat, interval = 'confidence')
+```     
+
+< We are 95% confident that the average life expectancy for a country in the OECD group with an average PPGDP of 9.5 would be between 79.41585 and 80.22072 years. > 
+
+#### 21. Create a 95% prediction interval for the life expectancy of a country in the OECD with an average per person GDP (log scale) of 9.5. *Briefly interpret this interval.*
+
+```{r}
+predict(life.lm, newdata = new.dat, interval = 'predict')
+``` 
+
+< We are 95% confident that the life expectancy for a country in the OECD group with an average PPGDP of 9.5 would be between 77.65424 and 81.98233 years. > 
+
+#### 22. Alter the code I provided in the "Module 5 - In-Class Coding Analysis.RMD" file (under the heading "Plot the fitted model") to plot the fitted model on the scatterplot you created above (with the two continuous variables). Hint: you should have 3 different lines on your plot, and you will not need to have different line types (you will need to have different colors). Note: unless you previously changed the order of the levels, you will not need to re-order the levels of Group.
+
+```{r, fig.align='center'}
+# Make a new data frame with only the variables from the orignial data set
+# (remove the dummy variables)
+life.orig <- life[, 1:4]
+
+# re-order levels so the legend/colors on this plot match the scatterplot
+# created earlier
+levels(life.orig$Group)
+life.orig$Group <- factor(life.orig$Group, 
+                                levels = c("other", "africa", "oecd"))
+levels(life.orig$Group)
+
+# Use the model where R creates the dummy variables for you
+life.lm.plot <- lm(LifeExp ~ PPGDP + Group, 
+                     data = life.orig)
+
+# Plot
+ggplot(life.orig, aes(x = PPGDP, y = LifeExp, 
+                        color = Group)) +
+  geom_point(size = 4) +
+  theme_bw() +
+  #scale_x_continuous(limits = c(0, 20)) +
+  #scale_y_continuous(limits = c(9000, 30000)) +
+  geom_smooth(method = "lm", 
+              mapping = aes(y = predict(life.lm.plot, life.orig), 
+                            linetype = Group)) +
+  theme(aspect.ratio = 1)
+```
+
+#### 23. Fit a multiple linear regression model to the data using SOME of the dummy variables you created, and include an interaction term between PPGDP and Group. *USE "other" AS THE BASELINE CATEGORY FOR GROUP*. Look at a summary of the results.
+
+```{r, fig.align='center'}
+life.int <- lm(LifeExp ~ Group + PPGDP + PPGDP:Group, data = life)
+summary(life.int)
+```
+
+#### 24. Use the `anova` function to test if the overall interaction between PPGDP and Group is significant. What do you conclude?
+
+```{r}
+anova(life.int)
+```
+
+< Based off of the anova table, I would say that there is a significant interaction between Group and PPGDP, the summary function shows that there is only an interaction between the group oecd and PPGDP. From this I would conclude that there is indeed an significant interaction between the two and that is should be left in the model. > 
+
+#### 25. Alter the code I provided in the "Module 5 - In-Class Coding Analysis.RMD" file (under the heading "Plot the fitted model that included the interaction between Education and Manager.") to plot the fitted model, with the interaction term, on the scatterplot you created above (with the two continuous variables). Hint: you should have 3 different lines on your plot, and you will not need to have different line types (you will need to have different colors). Note: unless you previously changed the order of the levels, you will not need to re-order the levels of Group.
+
+```{r, fig.align='center'}
+life.lm.plot.2 <- lm(LifeExp ~ Group + PPGDP + PPGDP:Group, 
+                     data = life.orig)
+
+# Plot
+ggplot(life.orig, aes(x = PPGDP, y = LifeExp, 
+                        color = Group)) +
+  geom_point(size = 4) +
+  theme_bw() +
+  #scale_x_continuous(limits = c(0, 20)) +
+  #scale_y_continuous(limits = c(9000, 30000)) +
+  geom_smooth(method = "lm", 
+              mapping = aes(y = predict(life.lm.plot.2, life.orig), 
+                            linetype = Group)) +
+  theme(aspect.ratio = 1)
+```
+
+#### 26. How did the fitted lines change when you included an interaction term compared with when you did not include an interaction term?
+
+< To be honest, the fitted lines did not seem to change at all when we added an interaction term, so maybe in this case it is not necessary to include the interaction term because it did not have an effect on the results. > 
+
+#### 27. Briefly summarize (1) the purpose of this data set and analysis and (2) what you learned about this data set from your analysis. Write your response as if you were addressing a non-statistician (do not include any numbers or software output).
+
+< The purpose of this data set analysis was to see if we could accurately predict the average life expectancy of a country depending on which development group it belongs to and the average PPGDP of that country while taking into account if both the PPGDP and certain groups together had an significant effect on the life expectancy. We found from this analysis that we can use the group and the PPGDP of a country to accurately predict the average life expectancy of a country. > 

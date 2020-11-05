@@ -1,0 +1,258 @@
+---
+title: "Homework 2"
+subtitle: <center> <h1>Simple Linear Regression Model Assumptions</h1> </center>
+author: <center> < Daniel Brewer > <center>
+output: html_document
+---
+
+<style type="text/css">
+h1.title {
+  font-size: 40px;
+  text-align: center;
+}
+</style>
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(ggfortify)
+library(car)
+```
+
+## Data and Description
+
+One key component of determining appropriate speed limits is the amount of distance that is required to stop at a given speed. For example, in residential neighborhoods, when pedestrians are commonly in the roadways, it is important to be able to stop in a very short distance to ensure pedestrian safety. The speed of vehicles may be useful for determining the distance required to stop at that given speed, which can aid public officials in determining speed limits.
+
+The Stopping Distance data set compares the **distance (column 2)** (in feet) required for a car to stop on a certain rural road against the **speed (column 1)** (MPH) of the car. Download the StoppingDistance.txt file from Canvas, and put it in the same folder as this R Markdown file.
+
+#### 0. Replace the text "< PUT YOUR NAME HERE >" (above next to "author:") with your full name (in quotation marks).
+
+#### 1. Read in the data set, and call the data frame "stop".  
+
+```{r}
+stop <- read.csv(stop, header = TRUE, sep = " ")
+glimpse(stop)
+stop2 <- stop
+```
+
+#### 2. Create a scatterplot of the data with variables on the appropriate axes. Make you plot look professional (make sure the axes have appropriate limits to capture the data nicely, make sure the axes labels are descriptive, etc.).
+
+```{r, fig.align='center'}
+stop.plot <- ggplot(data = stop, mapping = aes(x = Speed, y = Distance)) +
+  geom_point() +
+  theme_bw() +
+  theme(aspect.ratio = 1)
+stop.plot
+
+```
+
+#### 3. Briefly describe the relationship between Speed and Distance.
+
+< There seems to be a strong positive relationship between speed and stopping distance, however the relationship doesn't look like it is necessarily linear, or are the variance equal from the left side of the graph to the right side of the graph >
+
+#### 4. Add the OLS regression line to the scatterplot you created in 2 (note: if you receive a warning about rows with missing values, you may need to adjust an axis limit).
+
+```{r, fig.align='center'}
+stop.plot + geom_smooth(method = "lm", se = FALSE) 
+```
+
+#### 5. Apply linear regression to the data (no transformations), and save the residuals and fitted values to the `stop` dataframe.
+
+```{r}
+stop_lm <- lm(Distance ~ Speed, data = stop)
+summary(stop_lm)
+stop$residuals <- stop_lm$residuals
+stop$fittedDistance <- stop_lm$fitted.values
+```
+
+#### 6. Mathematically write out the simple linear regression model for this data set using the coefficients you found above. Do not use "x" and "y" in your model - use variable names that are fairly descriptive.
+
+< $\hat{Distance} = -20.13 + 3.14\hat{Speed} $ >
+
+
+
+### Questions 7-10 involve using diagnostics to determine if the linear regression assumptions are met. For each assumption, (1) perform appropriate diagnostics to determine if the assumption is violated, and (2) explain whether or not you think the assumption is violated and why you think that.
+
+#### 7. x vs y is linear (use at least two diagnostic tools)
+
+```{r, fig.align='center'}
+#This is a Residuals vs. Fitted values Plot that helps assess linearity and homoscedasticity
+stop.fitted <- ggplot(data = stop, mapping = aes(x = fittedDistance, y = residuals)) +
+  geom_point() +
+  theme_bw() +
+  theme(aspect.ratio = 1)
+stop.fitted
+#This is a Residuals vs. Predictor Plot that helps assess linearity.
+stop.predictor <- ggplot(data = stop, mapping = aes(x = Speed, y = residuals)) +
+  geom_point() +
+  theme_bw() +
+  theme(aspect.ratio = 1)
+stop.predictor
+```
+
+< I think that the assumption is violated because the residuals seem to have a curved trend, and be heteroscedastic in both the Residual vs Predictor and the Residual vs fitted values plots.There is not apparent randomness to the residuals, they seem to follow some pattern.  >
+
+#### 8. The residuals are normally distributed and centered at zero (use at least three diagnostic tools)
+
+```{r, fig.align='center'}
+#Histogram to sho normality and possible influencial points or outliers
+stop.hist <- ggplot(data=stop, aes(x = residuals, y = ..density..)) + geom_histogram(binwidth = 3) +
+  theme_bw() +
+  geom_density() +
+  theme(aspect.ratio = 1)
+              
+stop.hist
+stop.box <- ggplot(data=stop, aes(y = residuals)) + geom_boxplot() +
+  theme_bw() +
+  theme(aspect.ratio = 1)
+stop.box
+
+shapiro.test(stop$residuals)
+```
+
+< For the shapiro - wilk test, the test statistic is .97533 with a p value of .2449. This would suggest that we don't reject the null hypothesis that the data comes from a normal distribution. The histogram plot shows the data to be fairly normal, but is seems to be strongly skewed to the right with the right tail being twice as far as the left tail. The boxplot also show that the curve is skewed to the right and not normal because it has several outliers and possible influential points.>
+
+#### 9. The residuals have constant variance across all values of x (use two diagnostic tools)
+
+```{r, fig.align='center'}
+#Q-Qplot to asses normal variance around the expected fit line
+stop.q <- ggplot(stop, aes(sample = residuals)) +
+  stat_qq() +
+  stat_qq_line() +
+  theme(aspect.ratio = 1)
+stop.q
+#Risiduals vs Predictor plot helps see if the residuals are randomly and normally distrubuted around the li ear line of fit
+stop.predictor
+
+```
+
+< The variances around the qqline are clearly do not have constant variance around the line, it follows normality for a little while, but it follows patterns of different variance from the left to the right of the plot. In the residual vs Predictor plot the variance around the predictor value of the residuals is not constant, rather it follows a U shaped trend with heterscadasticity. The larger Variance is to the right. >
+
+#### 10. The model describes all observations (i.e., there are no influential points) (use at least four diagnostic tools)
+
+```{r, fig.align='center'}
+#Cook's Distance helps asses possible influencial points by shoing how far from the model fit they are and how much they affect it.
+stop.cook <- ggplot(data = stop, aes(y =cooks.distance(stop_lm), x = Speed)) +
+  geom_point() +
+  geom_abline(slope = 0, intercept = 4/62) +
+  theme(aspect.ratio = 1)
+stop.cook
+#Histograms help us identify possible influencial points
+stop.hist
+#Boxplots help assess normality and identify possible influencial points
+stop.box
+#Q-Q plots can help identify possible influencial points
+stop.q
+
+```
+
+< The Histogram, Boxplot, and QQplots all indicate that the data is right skewed and that there may be some influential points to the right. Cooks Distance helps identify those point by scoring each observation's distance from the fitted line, and if a point has a distance greater than 4/n, the point is considered an outlier or an influential point. I plotted these distances and marked the 4/n, or 62, line. Therefore, about 4 points in the data set could be considered influential points. >
+
+#### 11. Based on your analysis of the diagnostic measures, briefly discuss why this simple linear regression model on the raw data (not transformed) is not appropriate.
+
+< The simple linear regression model is not appropriate without transformations because the residuals are clearly not normal, the data is heterscedistic, and there are several outliers and influential points. >
+
+#### 12. Fix the model by making any necessary transformations. Justify the transformation you chose. (Note: if boxCox(mod) throws an error, replace mod with the formula for the linear model, y ~ x.) (Note: you will  most likely need to repeat questions 12 and 13 until you are satisfied with the transformation you chose. Only then should you fill out this section - I only want to see the model you end up choosing, not all of your attempted models.)
+
+```{r, fig.align='center'}
+Speed2 <- stop$Speed
+Distance2 <- stop$Distance
+b <- boxCox(lm(Distance2 ~ Speed2))
+b
+#Based of of the bocCox, I decided to square root the y due to a lambda value close to 0.5.
+stop_lm.trans <- lm(sqrt(Distance) ~ Speed, data = stop)
+stop2$residuals <- stop_lm.trans$residuals
+stop2$fittedDistance <- stop_lm.trans$fitted.values
+stop.trans <- ggplot(data = stop2, mapping = aes(x = Speed, y = Distance)) +
+  geom_point() +
+  theme_bw() +
+  theme(aspect.ratio = 1)
+
+
+```
+
+#### 13. Now, re-check your transformed model and verify that the assumptions (the assumptions that were addressed in the questions above) are met. Provide a brief discussion about how each of the previously violated assumptions are now satisfied. Also, provide the code you used to assess adherence to the assumptions.
+
+```{r, fig.align='center'}
+#Box plot to assess normality and possible outliers or influencial points
+stop.box2 <- ggplot(data=stop2, aes(y = residuals)) + geom_boxplot() +
+  theme_bw() +
+  theme(aspect.ratio = 1)
+stop.box2
+#histogram to assess normality
+stop.hist2 <- ggplot(data=stop2, aes(x = residuals, y = ..density..)) + geom_histogram(binwidth = .3) +
+  theme_bw() +
+  geom_density() +
+  theme(aspect.ratio = 1)
+stop.hist2
+#This is a Residuals vs. Fitted values Plot that helps assess linearity and homoscedasticity
+stop.fitted2 <- ggplot(data = stop2, mapping = aes(x = fittedDistance, y = residuals)) +
+  geom_point() +
+  theme_bw() +
+  theme(aspect.ratio = 1)
+stop.fitted2
+stop.predictor2 <- ggplot(data = stop2, mapping = aes(x = Speed, y = residuals)) +
+  geom_point() +
+  theme_bw() +
+  theme(aspect.ratio = 1)
+stop.predictor2
+#Cook's Distance helps asses possible influencial points by shoing how far from the model fit they are and how much they affect it.
+stop.cook2 <- ggplot(data = stop2, aes(y =cooks.distance(stop_lm.trans), x = Speed)) +
+  geom_point() +
+  geom_abline(slope = 0, intercept = 4/62) +
+  theme(aspect.ratio = 1)
+stop.cook2
+#Q-Qplot to asses normal variance around the expected fit line
+stop.q2 <- ggplot(stop2, aes(sample = residuals)) +
+  stat_qq() +
+  stat_qq_line() +
+  theme(aspect.ratio = 1)
+stop.q2
+#Shapiro's test helps determine Normality
+shapiro.test(stop2$residuals)
+```
+< After the transformation, 
+1.the boxplot shows no outliers and shows the residuals to be normally distributed.
+2. The histogram shows the residuals to also be normally distributed, with maybe a few points on the ends a little further out that we would have expected.
+3. The Residuals vs Fitted values plot shows that the linearity assumption is met because there is an equal spread of residuals around the horizontal line and no distinct patterns.
+4. In the Residuals vs Predictor plot We can assume that the linearity assumption is met because there is an equal spread of residuals around the horizontal line and no distinct patterns.
+5. I used Cook's distance numerical diagnostic to fin out if there were any influential points. I plotted these values against the rule of anything bigger than 4/n is probably an outlier or influential point. I found three possible influential points, but they seem to fit the trend of the linear model and are not considered outliers by the boxplot.
+6. Based off of the QQplot, the data seems to follow the line and be fairly normal, however it does tail off a bit at the ends as is usually expected.
+7. I used Shapiro-Wilk test to determine normality and i got a p-value of .8072, therefore we will not reject the null hypothesis that the residuals are normally distributed
+Due to these graphs and diagnostic test, it is safe to assume that our transformed linear model is a good fit for the data.>
+
+#### 14. Mathematically write out the simple linear regression model for this data set using the coefficients you found above from your transformed model. Do not use "x" and "y" in your model - use variable names that are fairly descriptive.
+
+< $\sqrt{\hat{Distance}} = 1.4870 + 0.0935\hat{Speed}$ >
+
+#### 15. Plot your new fitted curve on the scatterplot of the original data. Do you think this curve fits the data better than the line you previously fit?
+
+```{r}
+# Sequence of Speed values that I am interested in using to predict Distance 
+pred.vals <- seq(min(stop2$Speed), max(stop2$Speed), length = 100)  
+# Predictions of sqrt(Distance)
+preds.trans <- stop_lm.trans$coefficients[1] + 
+  stop_lm.trans$coefficients[2] * pred.vals
+# Predictions of Distance
+preds.orig <- (preds.trans)^2  # use ^2 to "undo" sqrt transform
+preds <- data.frame("pred.vals" = pred.vals, "pred_orig" = preds.orig)
+stop.plot.curve <- ggplot(data = stop2, 
+                               mapping = aes(x = Speed, y = Distance)) +
+  geom_point() +
+  theme_bw() +
+  scale_x_continuous(limits = c(0, 50)) +
+  scale_y_continuous(limits = c(0, 150)) +
+  theme(aspect.ratio = 1)
+
+stop.plot.curve + 
+  geom_line(data = preds, 
+            aes(x = pred.vals, y = pred_orig), 
+            size = 1.5, color ="blue")
+  
+```
+
+< Based off of this graph, I do think that this curve fits the data better than the previous model >
+
+#### 16. Briefly summarize (1) the purpose of this data set and analysis and (2) what you learned about this data set from your analysis. Write your response as if you were addressing a non-statistician (do not include any numbers or software output).
+
+< 1. The purpose of this data set was to see if the Speed of a car could be used as a good predictor for the Distance it takes for the car to stop. Also had to determine if certain assumptions were met by the model we fit to the data so that we could correctly use it.
+2. From this data set I learned that Distance it takes to stop a car to stop can be predicted by the speed squared. The distance it takes to stop goes up by 1 foot for every .00874225 MPH increase in speed. >

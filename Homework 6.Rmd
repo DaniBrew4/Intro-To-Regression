@@ -1,0 +1,563 @@
+---
+title: "Homework 6"
+subtitle: <center> <h1>Multiple Linear Regression Variable Selection Methods</h1> </center>
+author: <center> < "Daniel Brewer" > <center>
+output: html_document
+---
+
+<style type="text/css">
+h1.title {
+font-size: 40px;
+text-align: center;
+}
+</style>
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(ggfortify)  # plot glmnet objects using ggplot instead of base R
+library(car)  # needed for VIFs
+library(corrplot)  # for colored correlation matrix plot
+library(bestglm)  # for stepwise methods
+library(glmnet)  # for ridge, lasso, and elastic net
+sz <- 15
+set.seed(12345)  # make sure to set your seed when doing cross validation!
+```
+
+### Data and Description
+
+**For this assignment, we are revisiting the data set used in Homework 4. I think it would be very benefical for you to review your Homework 4 before starting this one.**
+
+Measuring body fat is not simple. One method requires submerging the body underwater in a tank and measuring the increase in water level. A simpler method for estimating body fat would be preferred. In order to develop such a method, researchers recorded age (years), weight (pounds), height (inches), and three body circumference measurements (around the neck, chest, and abdominal (all in centimeters)) for 252 men. Each man’s percentage of body fat was accurately estimated by an underwater weighing technique (the variable brozek is the percentage of body fat). The hope is to be able to use this data to create a model that will accurately predict body fat percentage, by using just the basic variables recorded, without having to use the tank submerging method. 
+
+The data can be found in the BodyFat data set on Canvas. Download BodyFat.txt, and put it in the same folder as this R Markdown file.
+
+#### 0. Replace the text "< PUT YOUR NAME HERE >" (above next to "author:") with your full name (in quotation marks).
+
+#### 0b. Make sure to set your seed since some of the functions randomly split your data (use `set.seed` in the setup code chunk above)!
+
+#### 1. Read in the data set, and call the data frame "bodyfat".  
+
+```{r}
+bodyfat <- read.csv("BodyFat.txt", header = TRUE, sep = " ")
+```
+
+#### 2. Fit a multiple linear regression model using all variables in the data set. Look at a summary of the results. (Hint: you can copy your code from Homework 4 here.)
+
+```{r, fig.align='center'}
+body.lm <- lm( brozek ~. , data = bodyfat)
+summary(body.lm)
+```
+
+#### 3. Refer back to your Homework 4. In that assignment, you fit this multiple linear regression model: for each of the multiple linear regression assumptions listed below, state if they were met or not met.
+
+1. The x’s vs y are linear:   < Met >
+2. The residuals are normally distributed and centered at zero:   < met >
+3. The residuals are homoscedastic:   < met >
+4. No multicollinearity:   < not met >
+
+
+
+
+### You should have discovered, from Homework 4, that there is a multicollinearity problem. The goal of this assignment is to continue this analysis by identifying variables to potentially remove from the model to resolve the multicollinearity issues. 
+
+
+
+
+#### 4. Briefly explain why multicollinearity is a problem for multiple linear regression by identifying some (at least two) of the consequences of multicollinearity.
+
+< Multilinearity is a problem for multiple linear regression because estimates can have the wrong signs - the completely opposite direction of their effect, and because "significance" is hard to detect even for useful variables. >
+
+#### 5. Briefly explain the similarities and differences between the following methods: best subset, forward, backward, and sequential replacement. Do not just copy the algorithm from the class notes - use your own words to explain what these methods are doing.
+
+< Best Subset - Goes through all possible combinations of models and chooses the one with the best fit with the lowest penalization for each addedvariable.
+  Forward - Starts with no predeictors, just the intercept, and adds predictors one by one with the highest partial correlation first as long as they meet some BIC or AIC threshold untill no more variables meet the requirements.
+  Backward - Obtains a model metric, such as AIC, and removes a predictor and compares that model's metric to the previous model. Repeats for all variables and keeps the model with the smallest metric.
+  Sequential - Takes a 'Forward' step and add the best predictor within the metric threshold, then takes a 'backward' step and drops the worst predictor above the threshold. Reiterates the same pattern until the model stays the same.>
+
+#### 6. Briefly explain how shrinkage methods work (variance-bias tradeoff). Specifically, how can some of these methods be considered variable selection proceedures?
+
+< Shrinkage methods shrink the coefficients in the model towards 0, and the introduce a small amount of bias but reduce the variance of the estimates. This could help us avoid a major problem with multicollinearity. This is a variance-bias tradeoff. Some of these can be considered variable selection precedures because they can result in variables having a coefficient of exactly zero and being dropped from the model. >
+
+#### 7. Briefly explain the similarities/difference between ridge regression, LASSO, and elastic net.
+
+< Ridge regression - Robust against small changes to data and produces more precise values of $\hat{y}$ when there is high multicollinearity, butis not directly applicable for traditional inference. 
+  LASSO - Allows estimates to shrink to zero, a way to select variables. can miss out on variable effect if there is high multicollinearity. More biased and will select up to n predictors.
+  Elastic Net - Similar to LASSO, but can select more than n predictors. Handles multicollinearity well and can select more than one variable from the correlated predictors. Has better Predictive performance. >
+
+#### 8. Remember, when coding these methods, the response variable must be the last column in the data set for the `bestglm` function to work. Switch the order of the columns in the data set so that brozek is last.
+
+```{r, fig.align='center'}
+bodyfat.rev <- bodyfat[,c(7, 6, 5, 4, 3, 2, 1)]
+```
+
+#### 9. (a) Apply all of the following variable selection methods to this data: best subset, forward, backward, sequential replacement, LASSO, and elastic net. For each one, you can choose which metric you would like to use (ex: AIC, BIC, PMSE). (b) Create a table (see template below, also you can Google how to make a table in RMarkdown) like the one at the end of the course notes (a row for each variable, a column for each variable selection method, an "X" in a cell means the variable was included for that variable selection method). *Include your organized and commented code for (a) and your table for (b).*
+
+```{r, fig.align='center'}
+#Exhaustive
+best.subsets.bic <- bestglm(bodyfat.rev,
+                            IC = "BIC",
+                            method = "exhaustive",
+                            TopModels = 10)
+# create a data frame with the number of variables and the BIC
+best.subsets.bic.df <- data.frame("num.vars" = 1:dim(bodyfat.rev)[2], 
+                                  "BIC" = best.subsets.bic$Subsets$BIC)
+
+# plot the BIC values against the number of variables
+ggplot(data = best.subsets.bic.df, mapping = aes(x = num.vars, y = BIC)) +
+  geom_point(size = 3) +
+  geom_line() +
+  geom_point(x = which.min(best.subsets.bic.df$BIC),
+             y = min(best.subsets.bic.df$BIC),
+             color = "red",
+             size = 3) +
+  scale_y_continuous(limits = c(720, 1040), 
+                     labels = seq(720, 1040, by = 20), 
+                     breaks = seq(720, 1040, by = 20), 
+                     minor_breaks = seq(720, 1040, by = 20)) +
+  scale_x_continuous(limits = c(1, 7), 
+                     labels = seq(1, 7, by = 1), 
+                     breaks = seq(1, 7, by = 1), 
+                     minor_breaks = seq(1, 7, by = 1)) +
+  theme_bw() +
+  theme(axis.title.x = element_text(size = sz),
+        axis.title.y = element_text(size = sz),
+        axis.text.x = element_text(size = sz),
+        axis.text.y = element_text(size = sz),
+        aspect.ratio = 1)
+
+# identify the best model according to the BIC
+summary(best.subsets.bic$BestModel)
+
+# look at the top 20 best models according to the BIC
+best.subsets.bic$BestModels
+
+#Forward
+best.subsets.bic <- bestglm(bodyfat.rev,
+                            IC = "BIC",
+                            method = "forward",
+                            TopModels = 10)
+# create a data frame with the number of variables and the BIC
+best.subsets.bic.df <- data.frame("num.vars" = 1:dim(bodyfat.rev)[2], 
+                                  "BIC" = best.subsets.bic$Subsets$BIC)
+
+# plot the BIC values against the number of variables
+ggplot(data = best.subsets.bic.df, mapping = aes(x = num.vars, y = BIC)) +
+  geom_point(size = 3) +
+  geom_line() +
+  geom_point(x = which.min(best.subsets.bic.df$BIC),
+             y = min(best.subsets.bic.df$BIC),
+             color = "red",
+             size = 3) +
+  scale_y_continuous(limits = c(720, 1040), 
+                     labels = seq(720, 1040, by = 20), 
+                     breaks = seq(720, 1040, by = 20), 
+                     minor_breaks = seq(720, 1040, by = 20)) +
+  scale_x_continuous(limits = c(1, 7), 
+                     labels = seq(1, 7, by = 1), 
+                     breaks = seq(1, 7, by = 1), 
+                     minor_breaks = seq(1, 7, by = 1)) +
+  theme_bw() +
+  theme(axis.title.x = element_text(size = sz),
+        axis.title.y = element_text(size = sz),
+        axis.text.x = element_text(size = sz),
+        axis.text.y = element_text(size = sz),
+        aspect.ratio = 1)
+
+# identify the best model according to the BIC
+summary(best.subsets.bic$BestModel)
+
+# look at the top 20 best models according to the BIC
+best.subsets.bic$BestModels
+
+#Backward
+best.subsets.bic <- bestglm(bodyfat.rev,
+                            IC = "BIC",
+                            method = "backward",
+                            TopModels = 10)
+# create a data frame with the number of variables and the BIC
+best.subsets.bic.df <- data.frame("num.vars" = 1:dim(bodyfat.rev)[2], 
+                                  "BIC" = best.subsets.bic$Subsets$BIC)
+
+# plot the BIC values against the number of variables
+ggplot(data = best.subsets.bic.df, mapping = aes(x = num.vars, y = BIC)) +
+  geom_point(size = 3) +
+  geom_line() +
+  geom_point(x = which.min(best.subsets.bic.df$BIC),
+             y = min(best.subsets.bic.df$BIC),
+             color = "red",
+             size = 3) +
+  scale_y_continuous(limits = c(720, 1040), 
+                     labels = seq(720, 1040, by = 20), 
+                     breaks = seq(720, 1040, by = 20), 
+                     minor_breaks = seq(720, 1040, by = 20)) +
+  scale_x_continuous(limits = c(1, 7), 
+                     labels = seq(1, 7, by = 1), 
+                     breaks = seq(1, 7, by = 1), 
+                     minor_breaks = seq(1, 7, by = 1)) +
+  theme_bw() +
+  theme(axis.title.x = element_text(size = sz),
+        axis.title.y = element_text(size = sz),
+        axis.text.x = element_text(size = sz),
+        axis.text.y = element_text(size = sz),
+        aspect.ratio = 1)
+
+# identify the best model according to the BIC
+summary(best.subsets.bic$BestModel)
+
+# look at the top 20 best models according to the BIC
+best.subsets.bic$BestModels
+
+#Sequential
+best.subsets.bic <- bestglm(bodyfat.rev,
+                            IC = "BIC",
+                            method = "seqrep",
+                            TopModels = 10)
+# create a data frame with the number of variables and the BIC
+best.subsets.bic.df <- data.frame("num.vars" = 1:dim(bodyfat.rev)[2], 
+                                  "BIC" = best.subsets.bic$Subsets$BIC)
+
+# plot the BIC values against the number of variables
+ggplot(data = best.subsets.bic.df, mapping = aes(x = num.vars, y = BIC)) +
+  geom_point(size = 3) +
+  geom_line() +
+  geom_point(x = which.min(best.subsets.bic.df$BIC),
+             y = min(best.subsets.bic.df$BIC),
+             color = "red",
+             size = 3) +
+  scale_y_continuous(limits = c(720, 1040), 
+                     labels = seq(720, 1040, by = 20), 
+                     breaks = seq(720, 1040, by = 20), 
+                     minor_breaks = seq(720, 1040, by = 20)) +
+  scale_x_continuous(limits = c(1, 7), 
+                     labels = seq(1, 7, by = 1), 
+                     breaks = seq(1, 7, by = 1), 
+                     minor_breaks = seq(1, 7, by = 1)) +
+  theme_bw() +
+  theme(axis.title.x = element_text(size = sz),
+        axis.title.y = element_text(size = sz),
+        axis.text.x = element_text(size = sz),
+        axis.text.y = element_text(size = sz),
+        aspect.ratio = 1)
+
+# identify the best model according to the BIC
+summary(best.subsets.bic$BestModel)
+
+# look at the top 20 best models according to the BIC
+best.subsets.bic$BestModels
+
+#LASSO
+# make a matrix for our covariates and pull out response as its own variable
+env.x <- as.matrix(bodyfat.rev[, 1:6])
+env.y <- bodyfat.rev[, 7]
+
+# Lasso (alpha = 1)
+env.ridge <- glmnet(x = env.x, y = env.y, alpha = 1)
+
+# plot (log) lambda vs coefficients
+autoplot(env.ridge, xvar = "lambda", label = FALSE, size = 1.5) +
+#  scale_y_continuous(limits = c(-1, 1), 
+#                     labels = seq(-1, 1, by = .2), 
+#                     breaks = seq(-1, 1, by = .2), 
+#                     minor_breaks = seq(-1, 1, by = .2)) +
+#  scale_x_continuous(limits = c(-5, 25), 
+#                     labels = seq(-5, 25, by = 5), 
+#                     breaks = seq(-5, 25, by = 5), 
+#                     minor_breaks = seq(-5, 25, by = 5)) +
+  theme_bw() +
+  theme(axis.title.x = element_text(size = sz),
+        axis.title.y = element_text(size = sz),
+        axis.text.x = element_text(size = sz),
+        axis.text.y = element_text(size = sz),
+        aspect.ratio = 1)
+
+# use cross validation to pick the "best" lambda (based on MSE)
+env.ridge.cv <- cv.glmnet(x = env.x, y = env.y, 
+                              type.measure = "mse", alpha = 1)
+
+# plot (log) lambda vs MSE
+autoplot(env.ridge.cv, label = FALSE) +
+#  scale_y_continuous(limits = c(15, 70), 
+#                     labels = seq(15, 70, by = 10), 
+#                     breaks = seq(15, 70, by = 10), 
+#                     minor_breaks = seq(15, 70, by = 10)) +
+#  scale_x_continuous(limits = c(1, 11), 
+#                     labels = seq(1, 11, by = 1), 
+#                     breaks = seq(1, 11, by = 1), 
+#                     minor_breaks = seq(1, 11, by = 1)) +
+  theme_bw() +
+  theme(axis.title.x = element_text(size = sz),
+        axis.title.y = element_text(size = sz),
+        axis.text.x = element_text(size = sz),
+        axis.text.y = element_text(size = sz),
+        aspect.ratio = 1)
+
+# lambda.min is the value of lambda that gives minimum mean cross-validated 
+# error
+env.ridge.cv$lambda.min
+# lambda.1se gives the most regularized model such that error is within one 
+# standard error of the minimum
+env.ridge.cv$lambda.1se
+
+# coefficients (betas) using a specific lambda penalty value
+coef(env.ridge.cv, s = "lambda.min")
+coef(env.ridge.cv, s = "lambda.1se")
+
+#Elestic Net
+# make a matrix for our covariates and pull out response as its own variable
+env.x <- as.matrix(bodyfat.rev[, 1:6])
+env.y <- bodyfat.rev[, 7]
+
+# Elestic Net (alpha = 0.5)
+env.ridge <- glmnet(x = env.x, y = env.y, alpha = 0.5)
+
+# plot (log) lambda vs coefficients
+autoplot(env.ridge, xvar = "lambda", label = FALSE, size = 1.5) +
+#  scale_y_continuous(limits = c(-1, 1), 
+#                     labels = seq(-1, 1, by = .2), 
+#                     breaks = seq(-1, 1, by = .2), 
+#                     minor_breaks = seq(-1, 1, by = .2)) +
+#  scale_x_continuous(limits = c(-5, 25), 
+#                     labels = seq(-5, 25, by = 5), 
+#                     breaks = seq(-5, 25, by = 5), 
+#                     minor_breaks = seq(-5, 25, by = 5)) +
+  theme_bw() +
+  theme(axis.title.x = element_text(size = sz),
+        axis.title.y = element_text(size = sz),
+        axis.text.x = element_text(size = sz),
+        axis.text.y = element_text(size = sz),
+        aspect.ratio = 1)
+
+# use cross validation to pick the "best" lambda (based on MSE)
+env.ridge.cv <- cv.glmnet(x = env.x, y = env.y, 
+                              type.measure = "mse", alpha = 0.5)
+
+# plot (log) lambda vs MSE
+autoplot(env.ridge.cv, label = FALSE) +
+#  scale_y_continuous(limits = c(15, 70), 
+#                     labels = seq(15, 70, by = 10), 
+#                     breaks = seq(15, 70, by = 10), 
+#                     minor_breaks = seq(15, 70, by = 10)) +
+#  scale_x_continuous(limits = c(1, 11), 
+#                     labels = seq(1, 11, by = 1), 
+#                     breaks = seq(1, 11, by = 1), 
+#                     minor_breaks = seq(1, 11, by = 1)) +
+  theme_bw() +
+  theme(axis.title.x = element_text(size = sz),
+        axis.title.y = element_text(size = sz),
+        axis.text.x = element_text(size = sz),
+        axis.text.y = element_text(size = sz),
+        aspect.ratio = 1)
+
+# lambda.min is the value of lambda that gives minimum mean cross-validated 
+# error
+env.ridge.cv$lambda.min
+# lambda.1se gives the most regularized model such that error is within one 
+# standard error of the minimum
+env.ridge.cv$lambda.1se
+
+# coefficients (betas) using a specific lambda penalty value
+coef(env.ridge.cv, s = "lambda.min")
+coef(env.ridge.cv, s = "lambda.1se")
+```  
+
+Variable     | Best Subset | Forward | Backward | Sequential Replacement | LASSO | Elastic Net   
+------------ | ----------- | ------- | -------- | ---------------------- | ----- | -------------
+age          |             |         |          |                        |       |
+weight       |      x      |    x    |    x     |           x            |       |   
+height       |             |         |          |                        |   x   |   x
+neck         |             |         |    x     |                        |   x   |   x
+chest        |             |         |          |                        |       |   
+abdom        |      x      |    x    |    x     |           x            |   x   |   x
+
+
+
+
+#### 10. Now that you have seen the various results from the different methods, pick a subset of variables that you will include in the model. Create the multiple linear regression model with these variables (alternatively, you can call the best model using $BestModel).
+
+```{r, fig.align='center'}
+body.best.lm <- lm( brozek ~ weight + abdom + neck, data = bodyfat)
+summary(body.best.lm)
+bodyfat$residuals <- body.best.lm$residuals
+bodyfat$fitted.values <- body.best.lm$fitted.values
+```
+
+#### 11. Now that you have chosen a model, check all of the model assumptions. For each of the 7 assumptions, comment on why you think the assumption is or is not met, and provide sufficent code (metrics) to justify your repsonse.
+
+*1. The x's vs y are linear*
+
+```{r, fig.align='center'}
+#This is a Residuals vs. Predictor Plot that helps assess linearity: NECK
+bodyfat.predictor <- ggplot(data = bodyfat, mapping = aes(x = neck , y = residuals)) +
+  geom_point() +
+  theme_bw() +
+  ggtitle("NECK") +
+  theme(aspect.ratio = 1)
+bodyfat.predictor
+#This is a Residuals vs. Predictor Plot that helps assess linearity: ABDOM
+bodyfat.predictor <- ggplot(data = bodyfat, mapping = aes(x = abdom , y = residuals)) +
+  geom_point() +
+  theme_bw() +
+  ggtitle("ABDOM") +
+  theme(aspect.ratio = 1)
+bodyfat.predictor
+#This is a Residuals vs. Predictor Plot that helps assess linearity: WEIGHT
+bodyfat.predictor <- ggplot(data = bodyfat, mapping = aes(x = weight , y = residuals)) +
+  geom_point() +
+  theme_bw() +
+  ggtitle("WEIGHT") +
+  theme(aspect.ratio = 1)
+bodyfat.predictor
+#Partial regression plots help assess linearity
+avPlots(body.best.lm)
+#This is a Residuals vs. Fitted values Plot that helps assess linearity and homoscedasticity
+bodyfat.fitted <- ggplot(data = bodyfat, mapping = aes(x = fitted.values, y = residuals)) +
+  geom_point() +
+  theme_bw() +
+  theme(aspect.ratio = 1)
+bodyfat.fitted
+```
+
+< The assumption that the x's vs y are linear is met. I based this off of the Predictor vs Residual plots, which all show no trend in the residuals, the Added-Variable plots which show each of the variable's plot vs brozeck to be linear, and because the residual vs fitted values plot shows no trends in the data, meaning that the points are evenly distributed around the linear model.    >
+
+*2. The residuals are independent across all values of y*
+
+< Met. We assume that the residuals are independent accros all values of y based off of the residual vs. fitted value plot which shows not trend to the residuals. This suggest that the residuals are not correlated, but rather independent. >
+
+*3. The residuals are normally distributed and centered at zero*
+
+```{r, fig.align='center'}
+#Box plot to assess normality and possible outliers or influencial points
+bodyfat.box <- ggplot(data=bodyfat, aes(y = residuals)) + geom_boxplot() +
+  theme_bw() +
+  theme(aspect.ratio = 1)
+bodyfat.box
+#histogram to assess normality
+bodyfat.hist <- ggplot(data = bodyfat, mapping = aes(x = residuals)) + 
+  geom_histogram(mapping = aes(y = ..density..), binwidth = 2) +
+  stat_function(fun = dnorm, color = "red", size = 2,
+                args = list(mean = mean(bodyfat$residuals), 
+                            sd = sd(bodyfat$residuals)))
+bodyfat.hist
+```
+
+< Met. Based off of the Box plot and the histogram, the residuals are centered at zero and normally distributed with no apparent bias or outliers. >
+
+*4. The residuals have constant variance across all values of the x's*
+
+```{r}
+# Brown forsyth test can help assess homoscedasticity
+grp <- as.factor(c(rep("lower", floor(dim(bodyfat)[1] / 2)), 
+                   rep("upper", ceiling(dim(bodyfat)[1] / 2))))
+leveneTest(bodyfat$residuals ~ grp, center = median)
+#This is a Residuals vs. Fitted values Plot that helps assess linearity and homoscedasticity
+bodyfat.fitted <- ggplot(data = bodyfat, mapping = aes(x = fitted.values, y = residuals)) +
+  geom_point() +
+  theme_bw() +
+  theme(aspect.ratio = 1)
+bodyfat.fitted
+```
+
+< The Residuals vs Fitted Values plot does not show that data is heteroscedastic. The plot shows that the residuals seem to have equal variance at the lower and upper bounds of the data. The Brown Forsyth test resulted in an F-test value of .0409 which has a p-value of .8399 on 249 df. This suggest that we fail to reject the null hypothesis that the data for bodyfat is homoscedastic. >
+
+*5. The model describes all observations (i.e., there are no influential points)*
+
+```{r, fig.align='center'}
+#DFBETAS
+
+#weight
+bodyfat.dfbetas <- as.data.frame(dfbetas(body.best.lm))
+bodyfat.dfbetas$obs <- 1:length(bodyfat$brozek)
+
+ggplot(data = bodyfat.dfbetas) + 
+   geom_point(mapping = aes(x = obs, y = abs(weight))) +
+#   geom_hline(mapping = aes(yintercept = 1), 
+#              color = "red", linetype = "dashed") +  # for n <= 30
+   geom_hline(mapping = aes(yintercept = 2 / sqrt(length(obs))), 
+              color = "red", linetype = "dashed") +  # for n > 30
+   theme_bw() +
+   theme(aspect.ratio = 1)
+ 
+# # identifies any observations with a DFBETA greater 
+# # than one (as seen on the plot)
+weight.extreme.dfbetas <- bodyfat.dfbetas[abs(bodyfat.dfbetas$weight) > 1, ]
+weight.extreme.dfbetas[order(weight.extreme.dfbetas$weight), ]
+
+#neck
+bodyfat.dfbetas <- as.data.frame(dfbetas(body.best.lm))
+bodyfat.dfbetas$obs <- 1:length(bodyfat$brozek)
+
+ggplot(data = bodyfat.dfbetas) + 
+   geom_point(mapping = aes(x = obs, y = abs(neck))) +
+#   geom_hline(mapping = aes(yintercept = 1), 
+#              color = "red", linetype = "dashed") +  # for n <= 30
+   geom_hline(mapping = aes(yintercept = 2 / sqrt(length(obs))), 
+              color = "red", linetype = "dashed") +  # for n > 30
+   theme_bw() +
+   theme(aspect.ratio = 1)
+ 
+# # identifies any observations with a DFBETA greater 
+# # than one (as seen on the plot)
+neck.extreme.dfbetas <- bodyfat.dfbetas[abs(bodyfat.dfbetas$neck) > 1, ]
+neck.extreme.dfbetas[order(neck.extreme.dfbetas$neck), ]
+
+#abdom
+bodyfat.dfbetas <- as.data.frame(dfbetas(body.best.lm))
+bodyfat.dfbetas$obs <- 1:length(bodyfat$brozek)
+
+ggplot(data = bodyfat.dfbetas) + 
+   geom_point(mapping = aes(x = obs, y = abs(abdom))) +
+#   geom_hline(mapping = aes(yintercept = 1), 
+#              color = "red", linetype = "dashed") +  # for n <= 30
+   geom_hline(mapping = aes(yintercept = 2 / sqrt(length(obs))), 
+              color = "red", linetype = "dashed") +  # for n > 30
+   theme_bw() +
+   theme(aspect.ratio = 1)
+ 
+# # identifies any observations with a DFBETA greater 
+# # than one (as seen on the plot)
+abdom.extreme.dfbetas <- bodyfat.dfbetas[abs(bodyfat.dfbetas$abdom) > 1, ]
+abdom.extreme.dfbetas[order(abdom.extreme.dfbetas$abdom), ]
+
+
+#DFFITS
+
+bodyfat.dffits <- data.frame("dffits" = dffits(body.best.lm))
+bodyfat.dffits$obs <- 1:length(bodyfat$brozek)
+ 
+ggplot(data = bodyfat.dffits) + 
+   geom_point(mapping = aes(x = obs, y = abs(dffits))) +
+#   geom_hline(mapping = aes(yintercept = 1), 
+#              color = "red", linetype = "dashed") +  # for n <= 30
+   geom_hline(mapping = aes(yintercept = 2 * sqrt(6 / length(obs))), 
+              color = "red", linetype = "dashed") +  # for n > 30
+   theme_bw() +
+   theme(aspect.ratio = 1)
+
+ bodyfat.dffits[abs(bodyfat.dffits$dffits) > 1, ]
+```
+
+< Met or Unsure. The DFBETAS show that there are no suspected outliers or influential points in any of the variables we used in the model. The DFFITS there is one possible outlier or influential point, obervation 39, but this observation fits along the expected value line and is not considered an outlier on the box plot either. We cannot be completely sure about this point without further investigation, but it is safe to say that the all the data point are accounted for as long as we keep this one point in mind.  >
+
+*6. All important predictors are included (combine with #7), and 7. No Multicollinearity (combine with #6)*
+
+```{r, fig.align='center'}
+#(a) Scatterplot Matrix
+plot.matrix <- pairs(brozek ~ abdom + weight + neck, data = bodyfat)
+plot.matrix
+#(b) Correlation Matrix
+corrplot(cor(bodyfat.rev), method = 'circle')
+#(c) Variance Inflation Factors (VIF)
+vif(body.best.lm)
+avgvif <- mean(vif(body.best.lm))
+names(avgvif) <- "Mean VIF"
+avgvif
+```
+
+< MET. Based off of the correlation plot, abdom, chest, neck, and weight were all highly correlated with brozeck; however, we only keptabdom, neck, and weight due to the high multicollinearity between abdom, chest neck and weight. The VIF's on these three variables show a relatively lof average VIF anf none of them are near ten, so we can assume that the multicollinearity assumption is met.  >
+
+
+
+
+#### 12. Briefly summarize (1) the purpose of this data set and analysis and (2) what you learned about this data set from your analysis. Write your response as if you were addressing a non-statistician (do not include any numbers or software output).
+
+< The purpose of this data set was to determine if we could predict brozeck from a simpler set of measuremnts that we had done before without loosing our ability to predict brozek accurately. From this data set we learned that we can accurately predict brozek from the weight, abdom, and neck measuements of a person.  >

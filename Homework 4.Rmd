@@ -1,0 +1,292 @@
+---
+title: "Homework 4"
+subtitle: <center> <h1>Multiple Linear Regression</h1> </center>
+author: <center> < "Daniel Blake Brewer" > <center>
+output: html_document
+---
+
+<style type="text/css">
+h1.title {
+  font-size: 40px;
+  text-align: center;
+}
+</style>
+
+```{r setup, include=FALSE}
+# load packages here
+library(tidyverse)
+library(ggfortify)  # plot lm objects using ggplot instead of base R
+library(car)  # needed for added-variable plots and dfbetas and dffits
+```
+
+## Data and Description
+
+Measuring body fat is not simple. One method requires submerging the body underwater in a tank and measuring the increase in water level. A simpler method for estimating body fat would be preferred. In order to develop such a method, researchers recorded age (years), weight (pounds), height (inches), and three body circumference measurements (around the neck, chest, and abdominal (all in centimeters)) for 252 men. Each man’s percentage of body fat was accurately estimated by an underwater weighing technique (the variable brozek is the percentage of body fat). The hope is to be able to use this data to create a model that will accurately predict body fat percentage, by using just the basic variables recorded, without having to use the tank submerging method. 
+
+The data can be found in the BodyFat data set on Canvas. Download "BodyFat.txt", and put it in the same folder as this R Markdown file.
+
+#### 0. Replace the text "< PUT YOUR NAME HERE >" (above next to "author:") with your full name (in quotation marks).
+
+#### 1. Read in the data set, and call the data frame "bodyfat".  
+
+```{r}
+bodyfat <- read.csv("BodyFat.txt", header = TRUE, sep = " ")
+```
+
+#### 2. Create a scatterplot matrix of the data.
+
+```{r, fig.align='center'}
+plot.matrix <- pairs( brozek ~. , data = bodyfat)
+plot.matrix
+```
+
+#### 3. Based on the scatterplot matrix, briefly explain which variables you think will be "significant" for predicting brozek and which variables you think will *not* be helpful at predicting brozek. Explain how the scatterplot helped determine your answers.
+
+< Based on the scatterplot matrix, weight, neck, chest, and abdom all seem to be "significant" for predicting brozek because there seems to be a fairly linear relationship between them and brozek. Age and height do NOT seem to be significant predictors for brozek because the scatterplot appears to have not strong relationship between the them and brozek. >
+#### 4. Create a correlation matrix.
+
+```{r}
+# your code here
+c.matrix <- round(cor(bodyfat), digits = 2)
+c.matrix
+```
+
+#### 5. Based on the scatterplot matrix and the correlation matrix, are their any pairs of variables that you suspect will cause a problem for the multicollinearity assumption? If so, which ones?
+
+< Based on the scatterplot matrix and the correlation matrix, there are several variables that may cause problems for the multicollinearity assumption. They are weight and neck, weight and chest, and weight and abdom which all have correlation values of .8 or greater. Neck and chest, and neck and abdom also appear to possibly cause multilinearity problems, however their correlation values are less than .8 > 
+
+#### 6. Fit a multiple linear regression model to the data (no transformations). Look at a summary of the results. Save the residuals and fitted values to the `bodyfat` data frame.
+
+```{r}
+body_lm <- lm( brozek ~. , data = bodyfat)
+summary(body_lm)
+bodyfat$residuals <- body_lm$residuals
+bodyfat$fitted.values <- body_lm$fitted.values
+```
+
+#### 7. Briefly comment on the "significance" of the variables: were you surprised by the results? Are there any variables that are significant that you think shouldn't be? Are there any variables that are not significant that you think should be?
+
+< From the summary we see that there are three variables that are significant, all of which are variables that I expected to be significant; however, there is one variable, chest, which I expected to be significant, but according to the p-value it is not. >
+
+#### 8. Briefly comment on the sign (+/-) of the coefficients for the variables. Are their any variables where the sign is the opposite of what you expected?
+
+< Yes, the variables of weight and neck I would have expected to have a positive coefficient and increase the brozek or water displaced, however they had a significantly negative slope. >
+
+#### 9. Mathematically write out the multiple linear regression model for this data set using the coefficients you found above. Do not use "x" and "y" in your model - use variable names that are fairly descriptive.
+
+< $$ \hat{bozek} = -20.1 + (5.010e-03)age - (8.733e-02)weight - (1.400e-01)height - (4.421e-01)neck + (4.844e-04)chest + (8.754e-01)abdom $$ >
+
+#### 11. *Assuming* the model assumptions are all met, how would you interpret the coefficient for Weight?
+
+< The brozek decreases by 8.733e-02, on average, for every lbs increase in weight for a person while holding all other values constant. >
+
+#### 12. Briefly explain what it means to "hold all else constant," when you interpret the coefficient for Weight?
+
+< Holding all else constant means that if none of the other values increase except weight, or after all other variables are accounted for, the slope is the effect of weight on brozek. >
+
+#### 13. Briefly explain what the F-test indicates, as reported in the model output from question 6.
+
+< Because the model output of the F-test has a significant p-value of 2.2e-16, we can learn from the F-test that at least one variable is useful for predicting brozek. >
+
+#### 14. Briefly interpret the adjusted R-squared, as reported in the model output from question 6.
+
+< The adjusted R-squared output tells us that about 71.5% of the variability in brozek is explained by the model, after accounting for the number of variables in the model. >
+
+#### 15. Now check to make sure each of the following assumptions for multiple linear regression are met. For each assumption, provide your code and a brief response about why you think the assumption is or is not met.
+
+*(a) The x's vs y are linear (use the residual vs. predictor plots, partial regression plots, and one other metric of your choice)*
+```{r, fig.align='center'}
+#This is a Residuals vs. Predictor Plot that helps assess linearity
+bodyfat.predictor <- ggplot(data = bodyfat, mapping = aes(x = brozek , y = residuals)) +
+  geom_point() +
+  theme_bw() +
+  theme(aspect.ratio = 1)
+bodyfat.predictor
+#Partial regression plots help assess linearity
+avPlots(body_lm)
+#This is a Residuals vs. Fitted values Plot that helps assess linearity and homoscedasticity
+bodyfat.fitted <- ggplot(data = bodyfat, mapping = aes(x = fitted.values, y = residuals)) +
+  geom_point() +
+  theme_bw() +
+  theme(aspect.ratio = 1)
+bodyfat.fitted
+```
+
+< The residual vs Predictor plot shows no obvious trend, suggesting that the linear model fit is a good fit and that the data is linear. The partial regression plot shows all 6 variables with linear trends, this suggest that the data is also linear, and that none of the variables have a nonlinear relationship. Then the Residuals vs. fitted.values plot also shows no trend in the data suggesting that the linear model is a good fit and the data is linear.  >
+
+*(b). The residuals are normally distributed and centered at zero (use at least 2 metrics)*
+```{r, fig.align='center'}
+#Box plot to assess normality and possible outliers or influencial points
+bodyfat.box <- ggplot(data=bodyfat, aes(y = residuals)) + geom_boxplot() +
+  theme_bw() +
+  theme(aspect.ratio = 1)
+bodyfat.box
+#histogram to assess normality
+bodyfat.hist <- ggplot(data = bodyfat, mapping = aes(x = residuals)) + 
+  geom_histogram(mapping = aes(y = ..density..), binwidth = 2) +
+  stat_function(fun = dnorm, color = "red", size = 2,
+                args = list(mean = mean(bodyfat$residuals), 
+                            sd = sd(bodyfat$residuals)))
+bodyfat.hist
+```
+
+< The boxplot shows that there are no suspected outliers and that the data seems to be very normally distributed. The Histogram also shows that the residuals are normally distributed and that the fit the normal curve nearly perfectly. In both cases the residuals are centered at zero. >
+
+*(c). The residuals are homoscedastic (use 2 metrics)*
+```{r, fig.align='center'}
+# *Residuals vs Fitted Values* See graph above in 15a
+# Brown forsyth test can help assess homoscedasticity
+grp <- as.factor(c(rep("lower", floor(dim(bodyfat)[1] / 2)), 
+                   rep("upper", ceiling(dim(bodyfat)[1] / 2))))
+leveneTest(bodyfat$residuals ~ grp, center = median)
+```
+
+< The Residuals vs Fitted Values plot does not show that data is heteroscedastic. The plot shows that the residuals seem to have equal variance at the lower and upper bounds of the data. The Brown Forsyth test resulted in an F-test value of .0419 which has a p-value of .838 on 249 df. This suggest that we fail to reject the null hypothesis that the data for bodyfat is homoscedastic.   >
+
+*(d). The model describes all observations - there are no influential points (use the DFBETAS, DFFITS, partial regression plots (no need to re-plot them here - just refer to the plots you made above), and one other metric of your choice)*
+```{r, fig.align='center'}
+#DFBETAS
+#AGE
+bodyfat.dfbetas <- as.data.frame(dfbetas(body_lm))
+bodyfat.dfbetas$obs <- 1:length(bodyfat$brozek)
+
+ggplot(data = bodyfat.dfbetas) + 
+   geom_point(mapping = aes(x = obs, y = abs(age))) +
+#   geom_hline(mapping = aes(yintercept = 1), 
+#              color = "red", linetype = "dashed") +  # for n <= 30
+   geom_hline(mapping = aes(yintercept = 2 / sqrt(length(obs))), 
+              color = "red", linetype = "dashed") +  # for n > 30
+   theme_bw() +
+   theme(aspect.ratio = 1)
+ 
+# # identifies any observations with a DFBETA greater 
+# # than one (as seen on the plot)
+age.extreme.dfbetas <- bodyfat.dfbetas[abs(bodyfat.dfbetas$age) > 1, ]
+age.extreme.dfbetas[order(age.extreme.dfbetas$age), ]
+#weight
+bodyfat.dfbetas <- as.data.frame(dfbetas(body_lm))
+bodyfat.dfbetas$obs <- 1:length(bodyfat$brozek)
+
+ggplot(data = bodyfat.dfbetas) + 
+   geom_point(mapping = aes(x = obs, y = abs(weight))) +
+#   geom_hline(mapping = aes(yintercept = 1), 
+#              color = "red", linetype = "dashed") +  # for n <= 30
+   geom_hline(mapping = aes(yintercept = 2 / sqrt(length(obs))), 
+              color = "red", linetype = "dashed") +  # for n > 30
+   theme_bw() +
+   theme(aspect.ratio = 1)
+ 
+# # identifies any observations with a DFBETA greater 
+# # than one (as seen on the plot)
+weight.extreme.dfbetas <- bodyfat.dfbetas[abs(bodyfat.dfbetas$weight) > 1, ]
+weight.extreme.dfbetas[order(weight.extreme.dfbetas$weight), ]
+#height
+bodyfat.dfbetas <- as.data.frame(dfbetas(body_lm))
+bodyfat.dfbetas$obs <- 1:length(bodyfat$brozek)
+
+ggplot(data = bodyfat.dfbetas) + 
+   geom_point(mapping = aes(x = obs, y = abs(height))) +
+#   geom_hline(mapping = aes(yintercept = 1), 
+#              color = "red", linetype = "dashed") +  # for n <= 30
+   geom_hline(mapping = aes(yintercept = 2 / sqrt(length(obs))), 
+              color = "red", linetype = "dashed") +  # for n > 30
+   theme_bw() +
+   theme(aspect.ratio = 1)
+ 
+# # identifies any observations with a DFBETA greater 
+# # than one (as seen on the plot)
+height.extreme.dfbetas <- bodyfat.dfbetas[abs(bodyfat.dfbetas$height) > 1, ]
+height.extreme.dfbetas[order(height.extreme.dfbetas$height), ]
+#neck
+bodyfat.dfbetas <- as.data.frame(dfbetas(body_lm))
+bodyfat.dfbetas$obs <- 1:length(bodyfat$brozek)
+
+ggplot(data = bodyfat.dfbetas) + 
+   geom_point(mapping = aes(x = obs, y = abs(neck))) +
+#   geom_hline(mapping = aes(yintercept = 1), 
+#              color = "red", linetype = "dashed") +  # for n <= 30
+   geom_hline(mapping = aes(yintercept = 2 / sqrt(length(obs))), 
+              color = "red", linetype = "dashed") +  # for n > 30
+   theme_bw() +
+   theme(aspect.ratio = 1)
+ 
+# # identifies any observations with a DFBETA greater 
+# # than one (as seen on the plot)
+neck.extreme.dfbetas <- bodyfat.dfbetas[abs(bodyfat.dfbetas$neck) > 1, ]
+neck.extreme.dfbetas[order(neck.extreme.dfbetas$neck), ]
+#chest
+bodyfat.dfbetas <- as.data.frame(dfbetas(body_lm))
+bodyfat.dfbetas$obs <- 1:length(bodyfat$brozek)
+
+ggplot(data = bodyfat.dfbetas) + 
+   geom_point(mapping = aes(x = obs, y = abs(chest))) +
+#   geom_hline(mapping = aes(yintercept = 1), 
+#              color = "red", linetype = "dashed") +  # for n <= 30
+   geom_hline(mapping = aes(yintercept = 2 / sqrt(length(obs))), 
+              color = "red", linetype = "dashed") +  # for n > 30
+   theme_bw() +
+   theme(aspect.ratio = 1)
+ 
+# # identifies any observations with a DFBETA greater 
+# # than one (as seen on the plot)
+chest.extreme.dfbetas <- bodyfat.dfbetas[abs(bodyfat.dfbetas$chest) > 1, ]
+chest.extreme.dfbetas[order(chest.extreme.dfbetas$chest), ]
+#abdom
+bodyfat.dfbetas <- as.data.frame(dfbetas(body_lm))
+bodyfat.dfbetas$obs <- 1:length(bodyfat$brozek)
+
+ggplot(data = bodyfat.dfbetas) + 
+   geom_point(mapping = aes(x = obs, y = abs(abdom))) +
+#   geom_hline(mapping = aes(yintercept = 1), 
+#              color = "red", linetype = "dashed") +  # for n <= 30
+   geom_hline(mapping = aes(yintercept = 2 / sqrt(length(obs))), 
+              color = "red", linetype = "dashed") +  # for n > 30
+   theme_bw() +
+   theme(aspect.ratio = 1)
+ 
+# # identifies any observations with a DFBETA greater 
+# # than one (as seen on the plot)
+abdom.extreme.dfbetas <- bodyfat.dfbetas[abs(bodyfat.dfbetas$abdom) > 1, ]
+abdom.extreme.dfbetas[order(abdom.extreme.dfbetas$abdom), ]
+
+
+#DFFITS
+
+bodyfat.dffits <- data.frame("dffits" = dffits(body_lm))
+bodyfat.dffits$obs <- 1:length(bodyfat$brozek)
+ 
+ggplot(data = bodyfat.dffits) + 
+   geom_point(mapping = aes(x = obs, y = abs(dffits))) +
+#   geom_hline(mapping = aes(yintercept = 1), 
+#              color = "red", linetype = "dashed") +  # for n <= 30
+   geom_hline(mapping = aes(yintercept = 2 * sqrt(6 / length(obs))), 
+              color = "red", linetype = "dashed") +  # for n > 30
+   theme_bw() +
+   theme(aspect.ratio = 1)
+
+ bodyfat.dffits[abs(bodyfat.dffits$dffits) > 1, ]
+ 
+# *Partial Regression Plots* #See 15a
+ 
+# Boxplot helps identify possible outliers or influential points #See 15b
+```
+
+< The boxplot shows that there are no suspected outliers or influential points, suggesting that the data does indeed describe all observations. The DFBETAS plots show that there is only one possible influential point (observation 39), and that the rest of the observation points do not seem to be overly large to declare an influential point. The DFFITS plot also shows one value to be greater than one (observation 39), and suggest that it is a possible influential point, however that all other observations seem to be non influential and not outliers. The partial regression plots also only show one possible influential point (39), and because it seems to fit the trend of the rest of the data and n is such a high number at 251, we can assume that this does not affect our data too much and that the assumption is still met that the model describes all observations. >
+
+*(e). No multicollinearity (for this assumption, compare the variance inflation factors to your comments in questions 5 and 7 - using the correlation matrix and checking for non-significant coefficients that you think should be significant. Do the variance inflation factors match your assumptions from questions 5 and 7? Is this assumption met?*
+```{r}
+#**(a) Scatterplot Matrix (already created - see #2 above)**
+#**(b) Correlation Matrix (already created - see #4 above)**
+#**(c)  Chest maybe should be significant but is not. **
+#**(d) Variance Inflation Factors (VIF)**
+vif(body_lm)
+avgvif <- mean(vif(body_lm))
+names(avgvif) <- "Mean VIF"
+avgvif
+```
+
+< Based off of the variance inflation factor, Weight chest and abdom all have higher values, especially weight, suggesting that the have multicollinearity as I predicted in problem 5 based off of the Scatterplot matrix and Correlation matrix, except that neck does not have as high of a value as we expected as we observed in problem 7. Therefore, the multicollinearity assumption is not met because the largest VIF is much more than 10 and the average VIF is much greater than 1. >
+
+#### 16. Briefly summarize (1) the purpose of this data set and analysis and (2) what you learned about this data set from your analysis. Write your response as if you were addressing a non-statistician (do not include any numbers or software output).
+
+< (1) The purpose of this data set analysis was to determine if we could accurately predict the average bozek value in water displaced from another, and easier to measure indicator such as weight, age, height, neck, chest, or abdom sizes. (2) From this analysis we were able to learn that weight, neck, and abdom sizes were all possibly good predictors of bozek, but some of these predictors may be affected by the other predictors, and while this does not hinder the predictive ability of our model, it may cause some of the estimates to have the wrong sign and some other variables that may be significant predictors such as chest to not be detected. I suggest possible removing some variables or combining the predictors together some how.  >

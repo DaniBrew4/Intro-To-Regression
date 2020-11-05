@@ -1,0 +1,20 @@
+---
+title: "Stat330Final"
+author: "Daniel Brewer"
+date: "11/1/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+phones <- read.csv("", header = TRUE, sep = ",")
+
+```
+
+```{r}
+
+```
