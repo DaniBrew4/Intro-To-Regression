@@ -1,5 +1,5 @@
 # Intro-To-Regression 
-My class work from STAT330 intro to regression to showcase my work in R. 
+My class work from intro to regression to showcase my work in R. 
 ### Please feel free to reference and learn from my code, but don't just copy it for your class work
 | File   |      Description      |
 |----------|:-------------:|
